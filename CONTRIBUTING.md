@@ -119,7 +119,7 @@ Twenty minutes stuck is normal. Two hours stuck is when you ask.
 
 ## Weekly sync
 
-Sundays. Each person brings:
+Mondays. Each person brings:
 
 - A 3-minute demo
 - One borrow-checker fight (and how you won or gave up)
