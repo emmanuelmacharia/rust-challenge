@@ -115,7 +115,7 @@ Read [The Rust Book](https://doc.rust-lang.org/book/) ch. 1–10 alongside.
 4. **Lean on the compiler and Clippy** before asking a human or an LLM.
    Read the full error message first.
 5. **Commit something every day**, even if it's a failing test.
-6. **Weekly sync** (Sundays): demo, show your ugliest borrow-checker fight,
+6. **Weekly sync** (Mondays): demo, show your ugliest borrow-checker fight,
    compare approaches to the same feature.
 7. It's a learning project. Heavily encourage **you to write code by hand**. You can use AI to help you triage and understand issues or further understanding how something would work, but writing by hand is still the best way to learn the new language
 8. You can use **any resource to learn** - YT tutorials, the rust book etc. There'll be a RESOURCES.md file at the root that you can contribute to, to share resources you find
