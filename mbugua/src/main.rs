@@ -1,3 +1,5 @@
+use std::io;
+
 // Control accepted commands
 enum Command {
     List,
@@ -49,7 +51,7 @@ fn main() {
 fn run(cmd: Command, todo_arr: &mut Vec<ToDo>) {
     match cmd {
         Command::List => list_todos(todo_arr),
-        Command::Add => add_todo(todo_arr, ToDo { id: 0, title: String::new(), status: false })
+        Command::Add => add_todo(todo_arr)
     }
 }
 
@@ -67,6 +69,25 @@ fn list_todos(todo_arr: &Vec<ToDo>) {
     }
 }
 
-fn add_todo(todo_arr: &mut Vec<ToDo>, new_todo: ToDo) {
+fn add_todo(todo_arr: &mut Vec<ToDo>) {
+
+    let mut input = String::new();
+
+    println!("Please type in your todo:::");
+
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read line");
+
+    let trimmed_todo = input.trim();
+    let new_todo = ToDo {
+        id: todo_arr.len() as u32,
+        title: trimmed_todo.to_string(),
+        status: false
+    };
+
     todo_arr.push(new_todo);
+
+    println!("Todo added successfully!");
+    println!("{:?}", todo_arr);
 }
