@@ -1,6 +1,7 @@
 // Control accepted commands
 enum Command {
     List,
+    Add,
 }
 
 #[derive(Debug)]
@@ -33,6 +34,7 @@ fn main() {
     // argument provided:: get command and send to run function
     let cmd = match args[1].as_str() {
         "list" => Command::List,
+        "add" => Command::Add,
         other => {
             eprintln!("Unknown command: {}", other);
             std::process::exit(1);
@@ -40,13 +42,14 @@ fn main() {
     };
 
     // pass the todos to run
-    run(cmd, &todo_arr);
+    run(cmd, &mut todo_arr);
 }
 
 // Execute the entered command
-fn run(cmd: Command, todo_arr: &Vec<ToDo>) {
+fn run(cmd: Command, todo_arr: &mut Vec<ToDo>) {
     match cmd {
         Command::List => list_todos(todo_arr),
+        Command::Add => add_todo(todo_arr, ToDo { id: 0, title: String::new(), status: false })
     }
 }
 
@@ -62,4 +65,8 @@ fn list_todos(todo_arr: &Vec<ToDo>) {
             todo.title
         );
     }
+}
+
+fn add_todo(todo_arr: &mut Vec<ToDo>, new_todo: ToDo) {
+    todo_arr.push(new_todo);
 }
