@@ -1,11 +1,13 @@
+use std::fmt::Debug;
 use std::fs::File;
 use std::io;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 
 // Control accepted commands
 enum Command {
     List,
     Add,
+    Check,
     Remove,
 }
 
@@ -22,7 +24,7 @@ fn main() {
 
     // File management:
     let file = File::open("todos.txt").expect("Could not open file");
-    let reader = BufReader::new(file);
+    let reader = BufReader::new(&file);
 
     // Read todos from file
     for line in reader.lines() {
@@ -47,7 +49,7 @@ fn main() {
             .parse()
             .expect("Invalid Status");
 
-        // Keep the parsed todo in memory for the requested command.
+        // Keep the parsed task in memory for the requested command.
         todo_arr.push(ToDo {
             id,
             title: task,
@@ -65,9 +67,10 @@ fn main() {
     }
 
     // argument provided:: get command and send to run function
-    let cmd = match args[1].as_str() {
+    let cmd: Command = match args[1].as_str() {
         "list" => Command::List,
         "add" => Command::Add,
+        "check" => Command::Check,
         "remove" => Command::Remove,
         other => {
             eprintln!("Unknown command: {}", other);
@@ -76,14 +79,24 @@ fn main() {
     };
 
     // pass the todos to run
-    run(cmd, &mut todo_arr);
+    run(&cmd, &mut todo_arr);
+
+    // Save changes made by add, check, or remove.
+    if !matches!(cmd, Command::List) {
+        let file = File::create("todos.txt").expect("Could not create file");
+        for task in todo_arr {
+            writeln!(&file, "{}#{}#{}", task.id, task.title, task.status)
+                .expect("Could not write to file");
+        }
+    }
 }
 
 // Execute the entered command
-fn run(cmd: Command, todo_arr: &mut Vec<ToDo>) {
+fn run(cmd: &Command, todo_arr: &mut Vec<ToDo>) {
     match cmd {
         Command::List => list_todos(todo_arr),
         Command::Add => add_todo(todo_arr),
+        Command::Check => mark_complete(todo_arr),
         Command::Remove => remove(todo_arr),
     }
 }
@@ -124,7 +137,7 @@ fn add_todo(todo_arr: &mut Vec<ToDo>) {
 
 fn remove(todo_arr: &mut Vec<ToDo>) {
     println!("Here is the list of todos:");
-    println!("{:?}", todo_arr);
+    list_todos(todo_arr);
     println!("Please type in the id of the todo you want to remove:::");
 
     let mut input = String::new();
@@ -138,4 +151,21 @@ fn remove(todo_arr: &mut Vec<ToDo>) {
 
     println!("Todo removed successfully!");
     println!("{:?}", todo_arr);
+}
+
+fn mark_complete(todo_arr: &mut Vec<ToDo>) {
+    println!("Please provide the id of the task you would like to mark as complete:::");
+
+    let mut id_to_check = String::new();
+    io::stdin()
+        .read_line(&mut id_to_check)
+        .expect("Failed to read line");
+
+    let id_int = id_to_check.trim().parse::<u32>().expect("Invalid ID");
+
+    let item = todo_arr.iter_mut().find(|item| item.id == id_int);
+
+    if let Some(item) = item {
+        item.status = true
+    }
 }
