@@ -1,4 +1,6 @@
+use std::fs::File;
 use std::io;
+use std::io::{BufRead, BufReader};
 
 // Control accepted commands
 enum Command {
@@ -17,19 +19,48 @@ struct ToDo {
 fn main() {
     // Manage our array of todos
     let mut todo_arr: Vec<ToDo> = Vec::new();
-    let first_todo = ToDo {
-        id: 1,
-        title: String::from("Go to Work"),
-        status: false,
-    };
-    todo_arr.push(first_todo);
+
+    // File management:
+    let file = File::open("todos.txt").expect("Could not open file");
+    let reader = BufReader::new(file);
+
+    // Read todos from file
+    for line in reader.lines() {
+        let line = line.expect("Could not read line");
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let mut fields = line.split('#');
+
+        let id = fields
+            .next()
+            .expect("Could not find id")
+            .parse::<u32>()
+            .expect("Invalid ID");
+
+        let task = fields.next().expect("Missing task").to_string();
+
+        let status = fields
+            .next()
+            .expect("Missing status")
+            .parse()
+            .expect("Invalid Status");
+
+        // Keep the parsed todo in memory for the requested command.
+        todo_arr.push(ToDo {
+            id,
+            title: task,
+            status,
+        });
+    }
 
     // Array of different commands from terminal
     let args: Vec<String> = std::env::args().collect();
 
     // if an argument is not provided print error on console
     if args.len() < 2 {
-        eprintln!("Usage: todo_list <command> [args]");
+        eprintln!("Usage: cargo run -- <command>");
         std::process::exit(1);
     }
 
