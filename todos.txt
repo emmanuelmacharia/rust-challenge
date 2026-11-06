@@ -1,3 +1,4 @@
-1#Go to Work#true
-2#Go to Gym#false
-3#Go for Lunch#false
+2#Format my tv#true
+3#Charge phone#true
+4#Buy charging cable#true
+5#Watch Movie#true
