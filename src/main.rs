@@ -23,7 +23,6 @@ struct ToDo {
 }
 
 fn main() {
-
     // Manage our array of todos
     let mut todo_arr: Vec<ToDo> = Vec::new();
 
@@ -40,9 +39,7 @@ fn main() {
 
         let mut fields = line.split('#');
 
-        let id = fields
-            .next().unwrap()
-            .to_string();
+        let id = fields.next().unwrap().to_string();
 
         let task = fields.next().expect("Missing task").to_string();
 
