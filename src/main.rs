@@ -1,3 +1,6 @@
+mod generate_uuid;
+
+use generate_uuid::generate_uuid;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io;
@@ -7,18 +10,22 @@ use std::io::{BufRead, BufReader, Write};
 enum Command {
     List,
     Add,
+    Update,
     Check,
     Remove,
 }
 
 #[derive(Debug)]
 struct ToDo {
-    id: u32,
+    id: String,
     title: String,
     status: bool,
 }
 
+
+
 fn main() {
+
     // Manage our array of todos
     let mut todo_arr: Vec<ToDo> = Vec::new();
 
@@ -36,10 +43,8 @@ fn main() {
         let mut fields = line.split('#');
 
         let id = fields
-            .next()
-            .expect("Could not find id")
-            .parse::<u32>()
-            .expect("Invalid ID");
+            .next().unwrap()
+            .to_string();
 
         let task = fields.next().expect("Missing task").to_string();
 
@@ -70,6 +75,7 @@ fn main() {
     let cmd: Command = match args[1].as_str() {
         "list" => Command::List,
         "add" => Command::Add,
+        "update" => Command::Update,
         "check" => Command::Check,
         "remove" => Command::Remove,
         other => {
@@ -96,6 +102,7 @@ fn run(cmd: &Command, todo_arr: &mut Vec<ToDo>) {
     match cmd {
         Command::List => list_todos(todo_arr),
         Command::Add => add_todo(todo_arr),
+        Command::Update => update_todo(todo_arr),
         Command::Check => mark_complete(todo_arr),
         Command::Remove => remove(todo_arr),
     }
@@ -105,7 +112,7 @@ fn run(cmd: &Command, todo_arr: &mut Vec<ToDo>) {
 fn list_todos(todo_arr: &Vec<ToDo>) {
     for todo in todo_arr {
         println!(
-            "{}. [{}] {}",
+            "{} [{}] {}",
             todo.id,
             if todo.status { "+" } else { " " },
             todo.title
@@ -124,7 +131,7 @@ fn add_todo(todo_arr: &mut Vec<ToDo>) {
 
     let trimmed_todo = input.trim();
     let new_todo = ToDo {
-        id: todo_arr.len() as u32,
+        id: generate_uuid(),
         title: trimmed_todo.to_string(),
         status: false,
     };
@@ -146,11 +153,46 @@ fn remove(todo_arr: &mut Vec<ToDo>) {
         .read_line(&mut input)
         .expect("Failed to read line");
 
-    let index = input.trim().parse::<usize>().unwrap();
-    todo_arr.remove(index - 1);
+    let index = input.trim().to_string();
 
-    println!("Todo removed successfully!");
-    println!("{:?}", todo_arr);
+    if todo_arr.iter().find(|x| x.id == index).is_none() {
+        println!("Unable to find an item with that id");
+    } else {
+        todo_arr.retain(|item| item.id != index);
+        println!("Todo removed successfully!");
+        println!("{:?}", todo_arr);
+    }
+}
+
+fn update_todo(todo_arr: &mut Vec<ToDo>) {
+    println!("Here is the list of todos:");
+    list_todos(todo_arr);
+    println!("Please type in the id of the todo you want to update:::");
+
+    let mut input = String::new();
+
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read line");
+
+    let index = input.trim().to_string();
+
+    if todo_arr.iter().find(|x| x.id == index).is_none() {
+        println!("Unable to find an item with that id");
+    } else {
+        println!("{}", index);
+        println!("Please type in the updated text for your todo");
+
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read line");
+
+        let updated_todo = input.trim().to_string();
+        println!("{}", updated_todo);
+
+        // println!("Todo removed successfully!");
+        // println!("{:?}", todo_arr);
+    }
 }
 
 fn mark_complete(todo_arr: &mut Vec<ToDo>) {
@@ -161,11 +203,16 @@ fn mark_complete(todo_arr: &mut Vec<ToDo>) {
         .read_line(&mut id_to_check)
         .expect("Failed to read line");
 
-    let id_int = id_to_check.trim().parse::<u32>().expect("Invalid ID");
+    let id_int = id_to_check.trim().to_string();
 
     let item = todo_arr.iter_mut().find(|item| item.id == id_int);
 
     if let Some(item) = item {
         item.status = true
+    } else  {
+        println!("A task with ID could not be found");
     }
 }
+
+
+
