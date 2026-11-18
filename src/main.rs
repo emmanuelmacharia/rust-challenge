@@ -22,8 +22,6 @@ struct ToDo {
     status: bool,
 }
 
-
-
 fn main() {
 
     // Manage our array of todos
@@ -174,33 +172,40 @@ fn update_todo(todo_arr: &mut Vec<ToDo>) -> bool {
     list_todos(todo_arr);
     println!("Please type in the id of the todo you want to update:::");
 
-    let mut input = String::new();
-
+    let mut id_input = String::new();
     io::stdin()
-        .read_line(&mut input)
+        .read_line(&mut id_input)
         .expect("Failed to read line");
+    let id = id_input.trim();
 
-    let index = input.trim().to_string();
-
-    if todo_arr.iter().find(|x| x.id == index).is_none() {
+    let Some(item) = todo_arr.iter_mut().find(|item| item.id == id) else {
         println!("Unable to find an item with that id");
-        false
-    } else {
-        println!("{}", index);
-        println!("Please type in the updated text for your todo");
+        return false;
+    };
 
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read line");
+    println!("Current text: {}", item.title);
+    println!("Please type in the updated text for your todo:::");
 
-        let updated_todo = input.trim().to_string();
-        println!("{}", updated_todo);
+    // Use a separate buffer so the id is not mixed into the new title.
+    let mut text_input = String::new();
+    io::stdin()
+        .read_line(&mut text_input)
+        .expect("Failed to read line");
+    let updated = text_input.trim();
 
-        // println!("Todo removed successfully!");
-        // println!("{:?}", todo_arr);
-        // TODO: apply the update; nothing is modified yet.
-        false
+    if updated.is_empty() {
+        println!("Updated text cannot be empty. Nothing changed.");
+        return false;
     }
+
+    if updated == item.title {
+        println!("Text is unchanged.");
+        return false;
+    }
+
+    item.title = updated.to_string();
+    println!("Todo updated successfully!");
+    true
 }
 
 fn mark_complete(todo_arr: &mut Vec<ToDo>) -> bool {
