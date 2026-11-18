@@ -5,7 +5,7 @@ library.
 
 - **Binary name:** `todo_list`
 - **Storage:** plain-text file `todos.txt` in the directory you run it from
-  (created automatically on the first `add`)
+  (it must exist, even if empty)
 
 ## Running
 
@@ -38,9 +38,8 @@ e0d08d7b-50b7-4bb8-821b-dc7aac78dabd [ ] Buy milk
 ## File format
 
 One todo per line: `id#title#status`, where `id` is a UUID v4 and `status`
-is `true` or `false`. Titles may contain `#`. The file is only rewritten when
-a command changes something, and it is written to a temp file and renamed so
-a crash can't corrupt it.
+is `true` or `false`. Titles must not contain `#`. The file is only rewritten
+when a command changes something.
 
 ## Development
 
