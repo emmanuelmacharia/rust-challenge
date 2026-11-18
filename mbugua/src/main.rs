@@ -84,11 +84,11 @@ fn main() {
         }
     };
 
-    // pass the todos to run
-    run(&cmd, &mut todo_arr);
+    // pass the todos to run; it reports whether anything changed
+    let changed = run(&cmd, &mut todo_arr);
 
-    // Save changes made by add, check, or remove.
-    if !matches!(cmd, Command::List) {
+    // Only save when a command actually modified the todos.
+    if changed {
         let file = File::create("todos.txt").expect("Could not create file");
         for task in todo_arr {
             writeln!(&file, "{}#{}#{}", task.id, task.title, task.status)
@@ -98,9 +98,13 @@ fn main() {
 }
 
 // Execute the entered command
-fn run(cmd: &Command, todo_arr: &mut Vec<ToDo>) {
+// Returns true if the todos were modified and need saving.
+fn run(cmd: &Command, todo_arr: &mut Vec<ToDo>) -> bool {
     match cmd {
-        Command::List => list_todos(todo_arr),
+        Command::List => {
+            list_todos(todo_arr);
+            false
+        }
         Command::Add => add_todo(todo_arr),
         Command::Update => update_todo(todo_arr),
         Command::Check => mark_complete(todo_arr),
@@ -120,7 +124,7 @@ fn list_todos(todo_arr: &Vec<ToDo>) {
     }
 }
 
-fn add_todo(todo_arr: &mut Vec<ToDo>) {
+fn add_todo(todo_arr: &mut Vec<ToDo>) -> bool {
     let mut input = String::new();
 
     println!("Please type in your todo:::");
@@ -139,10 +143,10 @@ fn add_todo(todo_arr: &mut Vec<ToDo>) {
     todo_arr.push(new_todo);
 
     println!("Todo added successfully!");
-    println!("{:?}", todo_arr);
+    true
 }
 
-fn remove(todo_arr: &mut Vec<ToDo>) {
+fn remove(todo_arr: &mut Vec<ToDo>) -> bool {
     println!("Here is the list of todos:");
     list_todos(todo_arr);
     println!("Please type in the id of the todo you want to remove:::");
@@ -155,16 +159,17 @@ fn remove(todo_arr: &mut Vec<ToDo>) {
 
     let index = input.trim().to_string();
 
-    if todo_arr.iter().find(|x| x.id == index).is_none() {
+    if !todo_arr.iter().any(|x| x.id == index) {
         println!("Unable to find an item with that id");
+        false
     } else {
         todo_arr.retain(|item| item.id != index);
         println!("Todo removed successfully!");
-        println!("{:?}", todo_arr);
+        true
     }
 }
 
-fn update_todo(todo_arr: &mut Vec<ToDo>) {
+fn update_todo(todo_arr: &mut Vec<ToDo>) -> bool {
     println!("Here is the list of todos:");
     list_todos(todo_arr);
     println!("Please type in the id of the todo you want to update:::");
@@ -179,6 +184,7 @@ fn update_todo(todo_arr: &mut Vec<ToDo>) {
 
     if todo_arr.iter().find(|x| x.id == index).is_none() {
         println!("Unable to find an item with that id");
+        false
     } else {
         println!("{}", index);
         println!("Please type in the updated text for your todo");
@@ -192,27 +198,35 @@ fn update_todo(todo_arr: &mut Vec<ToDo>) {
 
         // println!("Todo removed successfully!");
         // println!("{:?}", todo_arr);
+        // TODO: apply the update; nothing is modified yet.
+        false
     }
 }
 
-fn mark_complete(todo_arr: &mut Vec<ToDo>) {
+fn mark_complete(todo_arr: &mut Vec<ToDo>) -> bool {
+    println!("Here is the list of todos:");
+    list_todos(todo_arr);
     println!("Please provide the id of the task you would like to mark as complete:::");
 
-    let mut id_to_check = String::new();
+    let mut input = String::new();
     io::stdin()
-        .read_line(&mut id_to_check)
+        .read_line(&mut input)
         .expect("Failed to read line");
+    let id = input.trim();
 
-    let id_int = id_to_check.trim().to_string();
-
-    let item = todo_arr.iter_mut().find(|item| item.id == id_int);
-
-    if let Some(item) = item {
-        item.status = true
-    } else  {
-        println!("A task with ID could not be found");
+    match todo_arr.iter_mut().find(|item| item.id == id) {
+        Some(item) if item.status => {
+            println!("Todo is already complete.");
+            false
+        }
+        Some(item) => {
+            item.status = true;
+            println!("Todo marked as complete!");
+            true
+        }
+        None => {
+            println!("Unable to find an item with that id");
+            false
+        }
     }
 }
-
-
-
