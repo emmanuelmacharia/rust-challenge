@@ -1,10 +1,8 @@
 mod generate_uuid;
 
 use generate_uuid::generate_uuid;
-use std::fmt::Debug;
-use std::fs::File;
-use std::io;
-use std::io::{BufRead, BufReader, Write};
+use std::fs::{self, File};
+use std::io::{self, BufRead, BufReader, Write};
 
 // Control accepted commands
 enum Command {
@@ -15,53 +13,22 @@ enum Command {
     Remove,
 }
 
-#[derive(Debug)]
 struct ToDo {
     id: String,
     title: String,
     status: bool,
 }
 
-
+const TODO_FILE: &str = "todos.txt";
 
 fn main() {
-
-    // Manage our array of todos
-    let mut todo_arr: Vec<ToDo> = Vec::new();
-
-    // File management:
-    let file = File::open("todos.txt").expect("Could not open file");
-    let reader = BufReader::new(&file);
-
-    // Read todos from file
-    for line in reader.lines() {
-        let line = line.expect("Could not read line");
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let mut fields = line.split('#');
-
-        let id = fields
-            .next().unwrap()
-            .to_string();
-
-        let task = fields.next().expect("Missing task").to_string();
-
-        let status = fields
-            .next()
-            .expect("Missing status")
-            .parse()
-            .expect("Invalid Status");
-
-        // Keep the parsed task in memory for the requested command.
-        todo_arr.push(ToDo {
-            id,
-            title: task,
-            status,
-        });
+    if let Err(e) = try_main() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
     }
+}
 
+fn try_main() -> io::Result<()> {
     // Array of different commands from terminal
     let args: Vec<String> = std::env::args().collect();
 
@@ -84,26 +51,93 @@ fn main() {
         }
     };
 
+    // Manage our array of todos
+    let mut todo_arr = load_todos()?;
+
     // pass the todos to run; it reports whether anything changed
-    let changed = run(&cmd, &mut todo_arr);
+    let changed = run(&cmd, &mut todo_arr)?;
 
     // Only save when a command actually modified the todos.
     if changed {
-        let file = File::create("todos.txt").expect("Could not create file");
-        for task in todo_arr {
-            writeln!(&file, "{}#{}#{}", task.id, task.title, task.status)
-                .expect("Could not write to file");
-        }
+        save_todos(&todo_arr)?;
     }
+
+    Ok(())
+}
+
+// Parse one `id#title#status` line. The title may itself contain '#',
+// so split the id off the front and the status off the back.
+fn parse_line(line: &str) -> Result<ToDo, String> {
+    let (id, rest) = line.split_once('#').ok_or("missing title")?;
+    let (title, status) = rest.rsplit_once('#').ok_or("missing status")?;
+    let status = status
+        .parse()
+        .map_err(|_| format!("invalid status '{}'", status))?;
+
+    Ok(ToDo {
+        id: id.to_string(),
+        title: title.to_string(),
+        status,
+    })
+}
+
+fn format_line(todo: &ToDo) -> String {
+    format!("{}#{}#{}", todo.id, todo.title, todo.status)
+}
+
+// Read todos from file. A missing file just means there are no todos yet.
+fn load_todos() -> io::Result<Vec<ToDo>> {
+    let file = match File::open(TODO_FILE) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e),
+    };
+
+    let mut todo_arr = Vec::new();
+    for (index, line) in BufReader::new(file).lines().enumerate() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let todo = parse_line(&line).map_err(|msg| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("{} line {}: {}", TODO_FILE, index + 1, msg),
+            )
+        })?;
+        todo_arr.push(todo);
+    }
+
+    Ok(todo_arr)
+}
+
+// Write to a temp file then rename, so a crash mid-write can't lose todos.
+fn save_todos(todo_arr: &[ToDo]) -> io::Result<()> {
+    let tmp_path = format!("{}.tmp", TODO_FILE);
+    let mut file = File::create(&tmp_path)?;
+    for todo in todo_arr {
+        writeln!(file, "{}", format_line(todo))?;
+    }
+    file.sync_all()?;
+    fs::rename(&tmp_path, TODO_FILE)
+}
+
+// Print a message and read one trimmed line from stdin.
+fn prompt(message: &str) -> io::Result<String> {
+    println!("{}", message);
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
 }
 
 // Execute the entered command
 // Returns true if the todos were modified and need saving.
-fn run(cmd: &Command, todo_arr: &mut Vec<ToDo>) -> bool {
+fn run(cmd: &Command, todo_arr: &mut Vec<ToDo>) -> io::Result<bool> {
     match cmd {
         Command::List => {
             list_todos(todo_arr);
-            false
+            Ok(false)
         }
         Command::Add => add_todo(todo_arr),
         Command::Update => update_todo(todo_arr),
@@ -113,7 +147,10 @@ fn run(cmd: &Command, todo_arr: &mut Vec<ToDo>) -> bool {
 }
 
 // Actions
-fn list_todos(todo_arr: &Vec<ToDo>) {
+fn list_todos(todo_arr: &[ToDo]) {
+    if todo_arr.is_empty() {
+        println!("No todos yet.");
+    }
     for todo in todo_arr {
         println!(
             "{} [{}] {}",
@@ -124,109 +161,118 @@ fn list_todos(todo_arr: &Vec<ToDo>) {
     }
 }
 
-fn add_todo(todo_arr: &mut Vec<ToDo>) -> bool {
-    let mut input = String::new();
+fn add_todo(todo_arr: &mut Vec<ToDo>) -> io::Result<bool> {
+    let title = prompt("Please type in your todo:::")?;
 
-    println!("Please type in your todo:::");
+    if title.is_empty() {
+        println!("A todo cannot be empty. Nothing added.");
+        return Ok(false);
+    }
 
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
-
-    let trimmed_todo = input.trim();
-    let new_todo = ToDo {
+    todo_arr.push(ToDo {
         id: generate_uuid(),
-        title: trimmed_todo.to_string(),
+        title,
         status: false,
-    };
-
-    todo_arr.push(new_todo);
+    });
 
     println!("Todo added successfully!");
-    true
+    Ok(true)
 }
 
-fn remove(todo_arr: &mut Vec<ToDo>) -> bool {
+fn remove(todo_arr: &mut Vec<ToDo>) -> io::Result<bool> {
     println!("Here is the list of todos:");
     list_todos(todo_arr);
-    println!("Please type in the id of the todo you want to remove:::");
+    let id = prompt("Please type in the id of the todo you want to remove:::")?;
 
-    let mut input = String::new();
-
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
-
-    let index = input.trim().to_string();
-
-    if !todo_arr.iter().any(|x| x.id == index) {
+    if !todo_arr.iter().any(|x| x.id == id) {
         println!("Unable to find an item with that id");
-        false
-    } else {
-        todo_arr.retain(|item| item.id != index);
-        println!("Todo removed successfully!");
-        true
+        return Ok(false);
     }
+
+    todo_arr.retain(|item| item.id != id);
+    println!("Todo removed successfully!");
+    Ok(true)
 }
 
-fn update_todo(todo_arr: &mut Vec<ToDo>) -> bool {
+fn update_todo(todo_arr: &mut [ToDo]) -> io::Result<bool> {
     println!("Here is the list of todos:");
     list_todos(todo_arr);
-    println!("Please type in the id of the todo you want to update:::");
+    let id = prompt("Please type in the id of the todo you want to update:::")?;
 
-    let mut input = String::new();
-
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
-
-    let index = input.trim().to_string();
-
-    if todo_arr.iter().find(|x| x.id == index).is_none() {
+    let Some(item) = todo_arr.iter_mut().find(|item| item.id == id) else {
         println!("Unable to find an item with that id");
-        false
-    } else {
-        println!("{}", index);
-        println!("Please type in the updated text for your todo");
+        return Ok(false);
+    };
 
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read line");
+    println!("Current text: {}", item.title);
+    let updated = prompt("Please type in the updated text for your todo:::")?;
 
-        let updated_todo = input.trim().to_string();
-        println!("{}", updated_todo);
-
-        // println!("Todo removed successfully!");
-        // println!("{:?}", todo_arr);
-        // TODO: apply the update; nothing is modified yet.
-        false
+    if updated.is_empty() {
+        println!("Updated text cannot be empty. Nothing changed.");
+        return Ok(false);
     }
+
+    if updated == item.title {
+        println!("Text is unchanged.");
+        return Ok(false);
+    }
+
+    item.title = updated;
+    println!("Todo updated successfully!");
+    Ok(true)
 }
 
-fn mark_complete(todo_arr: &mut Vec<ToDo>) -> bool {
+fn mark_complete(todo_arr: &mut [ToDo]) -> io::Result<bool> {
     println!("Here is the list of todos:");
     list_todos(todo_arr);
-    println!("Please provide the id of the task you would like to mark as complete:::");
-
-    let mut input = String::new();
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
-    let id = input.trim();
+    let id = prompt("Please provide the id of the task you would like to mark as complete:::")?;
 
     match todo_arr.iter_mut().find(|item| item.id == id) {
         Some(item) if item.status => {
             println!("Todo is already complete.");
-            false
+            Ok(false)
         }
         Some(item) => {
             item.status = true;
             println!("Todo marked as complete!");
-            true
+            Ok(true)
         }
         None => {
             println!("Unable to find an item with that id");
-            false
+            Ok(false)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_a_valid_line() {
+        let todo = parse_line("abc#buy milk#true").unwrap();
+        assert_eq!(todo.id, "abc");
+        assert_eq!(todo.title, "buy milk");
+        assert!(todo.status);
+    }
+
+    #[test]
+    fn title_may_contain_hash() {
+        let todo = parse_line("abc#fix bug #42#false").unwrap();
+        assert_eq!(todo.title, "fix bug #42");
+        assert!(!todo.status);
+    }
+
+    #[test]
+    fn line_round_trips() {
+        let todo = parse_line("abc#a #tag#false").unwrap();
+        assert_eq!(format_line(&todo), "abc#a #tag#false");
+    }
+
+    #[test]
+    fn rejects_malformed_lines() {
+        assert!(parse_line("just-an-id").is_err());
+        assert!(parse_line("abc#no status").is_err());
+        assert!(parse_line("abc#title#maybe").is_err());
     }
 }
